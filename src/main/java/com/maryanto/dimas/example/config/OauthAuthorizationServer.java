@@ -1,7 +1,6 @@
-package com.maryanto.dimas.example.configurations;
+package com.maryanto.dimas.example.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
@@ -11,8 +10,7 @@ import org.springframework.security.oauth2.provider.token.TokenStore;
 
 @EnableResourceServer
 @Configuration
-public class OauthResourceServerConfiguration extends ResourceServerConfigurerAdapter {
-
+public class OauthAuthorizationServer extends ResourceServerConfigurerAdapter {
 
     @Autowired
     private OAuth2AccessDeniedHandler handler;
@@ -20,13 +18,9 @@ public class OauthResourceServerConfiguration extends ResourceServerConfigurerAd
     @Autowired
     private TokenStore tokenStore;
 
-    @Value("${oauth2.resource_id}")
-    private String RESOURCE_ID;
-
     @Override
     public void configure(ResourceServerSecurityConfigurer resources) throws Exception {
-//        super.configure(resources);
-        resources.resourceId(RESOURCE_ID)
+        resources.resourceId("client-code")
                 .tokenStore(tokenStore)
                 .accessDeniedHandler(handler)
                 .stateless(false);

@@ -1,20 +1,20 @@
-package com.maryanto.dimas.example.configurations;
+package com.maryanto.dimas.example.config;
 
-import com.google.common.collect.ImmutableList;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.security.SecurityProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.authentication.configuration.EnableGlobalAuthentication;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.provider.ClientDetailsService;
 import org.springframework.security.oauth2.provider.approval.ApprovalStore;
 import org.springframework.security.oauth2.provider.approval.TokenApprovalStore;
@@ -22,8 +22,9 @@ import org.springframework.security.oauth2.provider.approval.TokenStoreUserAppro
 import org.springframework.security.oauth2.provider.request.DefaultOAuth2RequestFactory;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.security.oauth2.provider.token.store.InMemoryTokenStore;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
@@ -31,38 +32,66 @@ import org.springframework.web.filter.CorsFilter;
 @EnableWebSecurity
 @EnableGlobalMethodSecurity(securedEnabled = true)
 @EnableGlobalAuthentication
-@Order(SecurityProperties.ACCESS_OVERRIDE_ORDER)
-public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
-
+public class WebSecurityConfiguration {
 
     @Autowired
     private ClientDetailsService clientDetailsService;
 
     @Bean
-    @Override
-    public AuthenticationManager authenticationManagerBean() throws Exception {
-        return super.authenticationManagerBean();
+    public UserDetailsService userDetailsService() {
+        InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+        UserDetails user = User.withUsername("user").password("password").roles("USER").build();
+        UserDetails admin = User.withUsername("admin").password("password").roles("USER", "ADMIN").build();
+        manager.createUser(user);
+        manager.createUser(admin);
+        return manager;
     }
 
-    @Override
-    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-//        super.configure(auth);
-        auth.inMemoryAuthentication()
-                .withUser("user").password("password").roles("USER").and()
-                .withUser("admin").password("password").roles("ADMIN", "USER");
-    }
+    @Configuration
+    @Order(1)
+    public static class ApiAuthenticationServer extends WebSecurityConfigurerAdapter {
 
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
+        @Bean
+        @Override
+        public AuthenticationManager authenticationManagerBean() throws Exception {
+            return super.authenticationManagerBean();
+        }
+
+        @Override
+        protected void configure(HttpSecurity http) throws Exception {
 //        super.configure(http);
-        http
-                .csrf().disable()
-                .cors().disable()
-                .authorizeRequests()
-                .antMatchers("/oauth/**").permitAll()
-                .anyRequest().authenticated()
-                .and().httpBasic()
-                .and().sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+            http.cors().disable()
+                    .csrf().disable();
+            http.antMatcher("/api/**")
+                    .authorizeRequests()
+                    .antMatchers("/oauth/**", "/login").permitAll()
+                    .anyRequest().authenticated()
+                    .and().sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+        }
+
+    }
+
+    @Configuration
+    public static class WebFormAuthenticationServer extends WebSecurityConfigurerAdapter {
+
+        @Bean
+        @Override
+        public AuthenticationManager authenticationManagerBean() throws Exception {
+            return super.authenticationManagerBean();
+        }
+
+        @Override
+        protected void configure(HttpSecurity http) throws Exception {
+//        super.configure(http);
+            http.cors().disable()
+                    .csrf().disable();
+            http.authorizeRequests()
+                    .antMatchers("/oauth/**").permitAll()
+                    .anyRequest().authenticated()
+                    .and().formLogin().permitAll()
+                .and().httpBasic();
+        }
+
     }
 
 
@@ -98,21 +127,6 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
         bean.setOrder(0);
         return bean;
     }
-
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        final CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedMethods(ImmutableList.of("HEAD",
-                "GET", "POST", "PUT", "DELETE", "PATCH"));
-        configuration.setAllowedOrigins(ImmutableList.of("*"));
-        configuration.setAllowCredentials(true);
-        configuration.setAllowedHeaders(ImmutableList.of("Authorization", "Cache-Control", "Content-Type"));
-        final UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
-
 
     @Bean
     public TokenStore tokenStore() {
